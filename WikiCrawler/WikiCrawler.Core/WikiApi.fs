@@ -47,7 +47,11 @@ module WikiApi =
                      ("format", "json")
                      ("pllimit", "500") ])
     
-    let getWebRequest pageTitle = WebRequest.Create(baseUri.With("titles", pageTitle).ToUri()) :?> HttpWebRequest
+    let getWebRequest pageTitle = 
+        let req = WebRequest.Create(baseUri.With("titles", pageTitle).ToUri()) :?> HttpWebRequest
+        req.UserAgent <-"WikiCrawler/0.1 (WikiCrawler)"
+        req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
+        req
     
     let getSerializer() = 
         let res = new JsonSerializer()

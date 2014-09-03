@@ -7,5 +7,5 @@ open WikiCrawler.Core
 type Class1() = 
     [<Test>]
     member __.Test1() = 
-        let res = Graph.GetWikiGraph "cat" 2 |> Async.RunSynchronously
+        let res = Graph.GetWikiGraph "Totoro" 2 |> Async.RunSynchronously
         res |> ignore
