@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 
-namespace SimpleGraph
+namespace WikiCrawler.Gui
 {
 	public static class FSharpInterop
 	{

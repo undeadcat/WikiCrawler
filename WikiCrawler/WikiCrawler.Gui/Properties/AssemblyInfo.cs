@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("WikiCrawler")]
+[assembly: AssemblyTitle("WikiCrawler.Gui")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("WikiCrawler")]
+[assembly: AssemblyProduct("WikiCrawler.Gui")]
 [assembly: AssemblyCopyright("Copyright ©  2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("828ac30c-7f24-498b-83f3-50a08cb190e4")]
+[assembly: Guid("2ac810ae-a4a7-42e6-aa40-4c8726acae68")]
 
 // Version information for an assembly consists of the following four values:
 //
