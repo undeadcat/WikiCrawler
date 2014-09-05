@@ -1,15 +1,11 @@
 ﻿using System;
 using System.Linq;
-using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using GraphX;
 using GraphX.Controls;
-using GraphX.GraphSharp.Algorithms.Layout;
 using GraphX.GraphSharp.Algorithms.Layout.Simple.FDP;
-using GraphX.GraphSharp.Algorithms.Layout.Simple.Tree;
 using GraphX.GraphSharp.Algorithms.OverlapRemoval;
 using GraphX.Logic;
 using QuickGraph;
