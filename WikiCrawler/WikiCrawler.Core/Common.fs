@@ -6,3 +6,4 @@ module Common =
     let inline curry f a b = f (a, b)
     let inline uncurry f (a, b) = f a b
     let inline swap (a, b) = (b, a)
+    let inline toString x = x.ToString()

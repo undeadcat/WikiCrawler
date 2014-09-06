@@ -15,7 +15,7 @@ namespace WikiCrawler.Gui
 
 		public static Func<T1, T2, TRes> ToCsharpFunc<T1, T2, TRes>(this FSharpFunc<T1, FSharpFunc<T2, TRes>> fSharpFunc)
 		{
-			return (s, i) => fSharpFunc.Invoke(s).Invoke(i);
+			return (s, i) => FSharpFunc<T1, T2>.InvokeFast(fSharpFunc, s, i);
 		}
 	}
 }

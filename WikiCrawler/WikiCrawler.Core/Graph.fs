@@ -3,9 +3,6 @@
 //TODO. Async.Parallel?
 //TODO. update partial graph
 module Graph = 
-    type Page = 
-        | Page of string
-    
     type Graph<'T when 'T : comparison>(root, adjacent : Map<'T, 'T list>) = 
         
         let getValue value = 
@@ -38,4 +35,4 @@ module Graph =
                 }
         inner 1 (Graph<'T>(startPage)) (Set<'T>([])) startPage |> Async.map fst
     
-    let GetWikiGraph = GetGraph WikiApi.GetLinks
+    let GetWikiGraph = GetGraph(TitleQuery.Single >> WikiApi.WikiApi().GetLinks)

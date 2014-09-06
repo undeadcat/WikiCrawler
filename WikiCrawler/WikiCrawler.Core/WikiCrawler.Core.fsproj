@@ -55,11 +55,13 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <None Include="App.config" />
-    <Compile Include="WikiApi.fs" />
-    <Content Include="packages.config" />
+    <Compile Include="UriBuilder.fs" />
     <Compile Include="Common.fs" />
+    <Compile Include="TitleQuery.fs" />
     <Compile Include="Monads.fs" />
+    <Compile Include="WikiApi.fs" />
     <Compile Include="Graph.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

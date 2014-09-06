@@ -1,76 +1,101 @@
 ﻿namespace WikiCrawler.Core
 
-//TODO. batch
-//TODO. batch url length.
-//TODO. max results count.
+open System.Net
+open System
+open System.Collections.Generic
+open Newtonsoft.Json
+open System.IO
+
 module WikiApi = 
-    open System.Net
-    open System
-    open System.Collections.Generic
-    open Newtonsoft.Json
-    open System.IO
-    
-    type UriBuilder(baseUri : String, query : (string * string) list) = 
-        
-        let queryToString() = 
-            if List.isEmpty query then String.Empty
-            else 
-                query
-                |> List.map (fun (key, value) -> sprintf "%s=%s" key value)
-                |> fun x -> String.Join("&", x)
-        
-        member __.With(pair) = new UriBuilder(baseUri, (pair :: query))
-        
-        member __.ToUri() = 
-            let (_, uri) = Uri.TryCreate(sprintf "%s?%s" baseUri (queryToString()), UriKind.RelativeOrAbsolute)
-            uri
-        
-        new(baseUri) = UriBuilder(baseUri, [])
+    //TODO. continuations
+    //TODO. compression. how to enable
+    //TODO. Canellation token.
+    //TODO. return choice?
+    type UriBuilder = WikiCrawler.Core.UriBuilder
     
     type JsonLink() = 
-        member val title = "" with get, set
+        [<JsonProperty("title")>]
+        member val Title = "" with get, set
     
     type JsonPage() = 
-        member val links = ([||] : JsonLink []) with get, set
+        [<JsonProperty("links")>]
+        member val Links = ([||] : JsonLink []) with get, set
     
-    type JsonQuery() = 
-        member val pages = new Dictionary<string, JsonPage>() with get, set
+    type private JsonQuery() = 
+        [<JsonProperty("pages")>]
+        member val Pages = new Dictionary<string, JsonPage>() with get, set
     
-    type JsonResponse() = 
-        member val query = new JsonQuery() with get, set
+    type private JsonError() = 
+        
+        [<JsonProperty("code")>]
+        member val Code = "" with get, set
+        
+        [<JsonProperty("info")>]
+        member val Info = "" with get, set
     
-    let baseUri = 
-        UriBuilder("http://en.wikipedia.org/w/api.php", 
-                   [ ("action", "query")
-                     ("prop", "links")
-                     ("redirects", "true")
-                     ("format", "json")
-                     ("pllimit", "500") ])
+    type private JsonResponse() = 
+        
+        [<JsonProperty("error")>]
+        member val Error = new JsonError() with get, set
+        
+        [<JsonProperty("warnings")>]
+        member val Warnings = new Dictionary<string, Dictionary<string, string>>() with get, set
+        
+        [<JsonProperty("query")>]
+        member val Query = new JsonQuery() with get, set
     
-    let getWebRequest pageTitle = 
-        let req = WebRequest.Create(baseUri.With("titles", pageTitle).ToUri()) :?> HttpWebRequest
-        req.UserAgent <-"WikiCrawler/0.1 (WikiCrawler)"
-        req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
-        req
+    type HttpWebResponseWrapper = 
+        { StatusCode : HttpStatusCode
+          Content : Stream }
     
-    let getSerializer() = 
-        let res = new JsonSerializer()
-        res
+    type WikiApiException(message : string) = 
+        inherit Exception(message)
     
-    let serializer = getSerializer()
-    
-    let getLinks (response : Stream) = 
-        serializer.Deserialize<JsonResponse>(new JsonTextReader(new StreamReader(response))).query.pages
-        |> Seq.map (fun x -> x.Value)
-        |> Seq.collect (fun x -> x.links)
-        |> Seq.map (fun x -> x.title)
-        |> Seq.toList
-    
-    let GetLinks(pageTitle : string) = 
-        //TODO. catch exceptions
-        //TODO. status code.
-        async { 
-            let req = getWebRequest pageTitle
-            let! res = req.AsyncGetResponse()
-            return res.GetResponseStream() |> getLinks
-        }
+    type WikiApi(executeRequest : HttpWebRequest -> HttpWebResponseWrapper Async) = 
+        
+        let baseUri = 
+            UriBuilder("http://en.wikipedia.org/w/api.php", 
+                       [ ("action", "query")
+                         ("prop", "links")
+                         ("redirects", "true")
+                         ("format", "json")
+                         ("pllimit", "500") ])
+        
+        let serializer = new JsonSerializer()
+        let cookieContainer = new CookieContainer()
+        
+        let createWebRequest (pageTitles : TitleQuery) = 
+            let req = WebRequest.Create(baseUri.With("titles", String.Join("|", pageTitles)).ToUri()) :?> HttpWebRequest
+            req.UserAgent <- "WikiCrawler/0.1 (WikiCrawler)"
+            req.CookieContainer <- cookieContainer
+            req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
+            req
+        
+        let deserialize (response : Stream) = 
+            serializer.Deserialize<JsonResponse>(new JsonTextReader(new StreamReader(response)))
+        
+        member __.GetLinks(pageTitle : TitleQuery) = 
+            async { 
+                let req = createWebRequest pageTitle
+                let! res = executeRequest req
+                if res.StatusCode <> HttpStatusCode.OK then 
+                    return raise (new WebException(sprintf "Invalid status code: %s" (res.StatusCode.ToString())))
+                let deserialized = res.Content |> deserialize
+                if not (String.IsNullOrWhiteSpace deserialized.Error.Code) then 
+                    raise (new WikiApiException(sprintf "Error: %s %s" deserialized.Error.Code deserialized.Error.Info))
+                if deserialized.Warnings.Values.Count > 0 then 
+                    deserialized.Warnings.Values
+                    |> Seq.collect (fun x -> x.Values)
+                    |> fun x -> raise (new WikiApiException("Warnings: " + String.Join("; ", x)))
+                return deserialized.Query.Pages.Values
+                       |> Seq.toList
+            }
+        
+        new() = 
+            let executeHttpRequest (req : HttpWebRequest) = 
+                req.AsyncGetResponse()
+                |> Async.map (fun x -> x :?> HttpWebResponse)
+                |> Async.map (fun x -> 
+                       { StatusCode = x.StatusCode
+                         Content = x.GetResponseStream() })
+            new WikiApi(executeHttpRequest)

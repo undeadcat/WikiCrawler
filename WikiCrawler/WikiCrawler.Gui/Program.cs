@@ -9,6 +9,8 @@ using Microsoft.Glee.GraphViewerGdi;
 
 namespace WikiCrawler.Gui
 {
+	//TODO. make ui responsive.
+	//TODO. update graph with async feedback.
 	public class Program
 	{
 		public static void Main()
