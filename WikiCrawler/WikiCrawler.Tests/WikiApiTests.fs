@@ -52,17 +52,8 @@ type WikiApiTests() =
         let setup = MockHttp().Setup(It.IsQueryContaining("titles", "cat|dog").Returns(HttpStatusCode.OK, content))
         let actual = doTest setup [ "Cat"; "Dog" ]
         
-        let expected = 
-            [ { Title = "Cat"
-                Links = [ { Title = "Fat cat" } ] }
-              { Title = "Dog"
-                Links = [ { Title = "Bad wolf" } ] } ]
+        let expected = [ Page( "Cat",[ { Title = "Fat cat" } ]); Page("Dog",[ { Title = "Bad wolf" } ]) ]
         Assert.That(actual, Is.EqualTo(expected))
-    
-    [<Test>]
-    member __.EmptyJsonArrayReturned_ReturnEmpty() = 
-        let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, "[]"))
-        Assert.That(doTest setup [ "a" ], Is.Empty)
     
     [<Test>]
     member __.Warning_ThrowException() = 
@@ -91,20 +82,20 @@ type WikiApiTests() =
             (Exception.OfType<WikiApiException>().WithMessage("Error: code info"), (fun () -> doTest setup [ "a" ]))
     
     [<Test>]
-    member __.PageNotFound_ReturnEmpty() = 
+    member __.PageNotFound_ReturnNotFound() = 
         let res = @"{
                     ""query"": {
                         ""pages"": {
                             ""-1"": {
                                 ""ns"": 0,
-                                ""title"": ""Aaaaa"",
-                                ""missing"": """"
+                                ""title"": ""a"",
                             }
                         }
                     }
                 }"
         let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, res))
-        Assert.That(doTest setup [ "a" ], Is.Empty)
+        let actual = doTest setup [ "a" ]
+        Assert.That(actual, Is.EqualTo([NotFound("a")]))
     
     [<Test>]
     member __.Continuation() = 
@@ -154,8 +145,5 @@ type WikiApiTests() =
         let actual = doTest setup [ "cat" ]
         
         let expected = 
-            [ { Title = "firstRequest"
-                Links = [ { Title = "link1" } ] }
-              { Title = "secondRequest"
-                Links = [ { Title = "link2" } ] } ]
+            [ Page("firstRequest",[ { Title = "link1" } ]);Page("secondRequest",[ { Title = "link2" } ]) ]
         Assert.That(actual, Is.EqualTo(expected))

@@ -2,6 +2,7 @@
 
 open System.Collections.Generic
 open System.Collections
+open System
 
 type TitleQuery private (titles : string seq) = 
     member __.Titles() = titles
@@ -9,8 +10,6 @@ type TitleQuery private (titles : string seq) =
     interface IEnumerable<string> with
         member __.GetEnumerator() : IEnumerator<string> = titles.GetEnumerator()
         member __.GetEnumerator() : IEnumerator = titles.GetEnumerator() :> IEnumerator
-    
-    static member Single(title : string) = TitleQuery([ title ])
     
     static member Create(titles : string seq) = 
         let titleLimit = 50
@@ -29,6 +28,10 @@ type TitleQuery private (titles : string seq) =
                 if count = titleLimit || ((charCount + String.length x) > queryStringLimit && List.length current > 0) then 
                     inner xs [ x ] 1 (String.length x) (newQuery() :: acc)
                 else inner xs (x :: current) (count + 1) (charCount + String.length x) acc
+        if titles
+           |> Seq.filter (String.IsNullOrWhiteSpace)
+           |> (Seq.isEmpty >> not)
+        then raise (new InvalidOperationException "Page title cannot be whitespace")
         inner (List.ofSeq titles) [] 0 0 []
     
     static member Titles(query : TitleQuery) = query.Titles()

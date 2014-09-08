@@ -7,10 +7,21 @@ open Newtonsoft.Json
 open System.IO
 
 module WikiApi = 
-    //TODO. compression. how to enable
     //TODO. Canellation token.
-    //TODO. return choice instead of throwing
+    //TODO. return choice instead of throwing?
     type UriBuilder = WikiCrawler.Core.UriBuilder
+    
+    type private JsonLink() = 
+        [<JsonProperty("title")>]
+        member val Title = "" with get, set
+    
+    type private JsonPage() = 
+        
+        [<JsonProperty("title")>]
+        member val Title = "" with get, set
+        
+        [<JsonProperty("links")>]
+        member val Links = [] : JsonLink list with get, set
     
     type private JsonContinueData() = 
         [<JsonProperty("links")>]
@@ -18,7 +29,7 @@ module WikiApi =
     
     type private JsonQuery() = 
         [<JsonProperty("pages")>]
-        member val Pages = new Dictionary<string, Page>() with get, set
+        member val Pages = new Dictionary<int, JsonPage>() with get, set
     
     type private JsonError() = 
         
@@ -49,6 +60,11 @@ module WikiApi =
         abstract GetBatch : unit -> (Page list * IResultCursor Option) Async
     
     type private ResultCursor(continuations : (String * String) list, getNextBatch : (String * String) Option -> JsonResponse Async) = 
+        
+        let ToPage(pair : KeyValuePair<int, JsonPage>) = 
+            if pair.Key < 0 then NotFound(pair.Value.Title)
+            else Page(pair.Value.Title, pair.Value.Links |> List.map (fun x -> { Title = x.Title }))
+        
         interface IResultCursor with
             member __.GetBatch() : Async<Page list * Option<IResultCursor>> = 
                 let (resultAsync, oldContinuations) = 
@@ -63,7 +79,11 @@ module WikiApi =
                         |> List.ofSeq
                         |> (@) oldContinuations
                     
-                    let items = List.ofSeq result.Query.Pages.Values
+                    let items = 
+                        result.Query.Pages
+                        |> Seq.map ToPage
+                        |> List.ofSeq
+                    
                     return if Seq.isEmpty continuations then (items, None)
                            else (items, Some(ResultCursor(continuations, getNextBatch) :> IResultCursor))
                 }
@@ -91,6 +111,9 @@ module WikiApi =
             let req = WebRequest.Create(uri.ToUri()) :?> HttpWebRequest
             req.UserAgent <- "WikiCrawler/0.1 (WikiCrawler)"
             req.CookieContainer <- cookieContainer
+            req.KeepAlive <- true
+            req.Accept <- "*/*"
+            req.Headers.Item("Cache-Control")<-"max-age=5"
             req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
             req
         

@@ -2,6 +2,8 @@
 
 open NUnit.Framework
 open WikiCrawler.Core
+open Helpers
+open System
 
 [<TestFixture>]
 type TitleQueryTests() = 
@@ -44,3 +46,7 @@ type TitleQueryTests() =
         Assert.That(actual, 
                     Is.EqualTo([ [ str ]
                                  [ str ] ]))
+    
+    [<Test>]
+    member __.WhitespaceTitle_ThrowException() = 
+        Assert.Throws(Exception.OfType<InvalidOperationException>(), fun () -> getQueryTitles [ "  "; "a" ])
