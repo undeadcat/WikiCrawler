@@ -21,7 +21,7 @@ namespace WikiCrawler.Gui
 				.Select(int.Parse)
 				.CombineLatest(FromTextChanged(form.StartPageText), (d, p) => new { Page = p, Depth = d })
 				.DistinctUntilChanged()
-				.Select(x => Observable.FromAsync(() => Core.Graph.GetWikiGraph.ToCsharpFunc()(x.Page, x.Depth).ToTask()))
+				.Select(x => Observable.FromAsync(() => Core.Graph.GetWikiGraph().ToTask()))
 				.Switch()
 				.ObserveOn(SynchronizationContext.Current)
 				.Select(ConvertGraph)

@@ -1,5 +1,7 @@
 ﻿namespace WikiCrawler.Core
 
+//TODO. can get different case.
+//TODO. can get duplicates from api.
 //TODO. Async.Parallel?
 //TODO. update partial graph
 module Graph = 
@@ -24,15 +26,6 @@ module Graph =
         new(root) = Graph(root, Map([ (root, []) ]))
     
     let GetGraph (getLinks : 'T -> 'T list Async) (startPage : 'T) (maxDepth : int) = 
-        let rec inner depth (graph : Graph<_>) (visited : Set<_>) page = 
-            if Set.contains page visited || depth > maxDepth then async.Return(graph, visited)
-            else 
-                async { 
-                    let! links = getLinks (page)
-                    let newGraph = links |> List.fold (fun (g : Graph<_>) i -> g.AddLink page i) graph
-                    let folder (graph, visited) item = inner (depth + 1) graph visited item
-                    return! Async.foldM folder (newGraph, visited.Add(page)) links
-                }
-        inner 1 (Graph<'T>(startPage)) (Set<'T>([])) startPage |> Async.map fst
+        async.Return (Graph(""))
     
-    let GetWikiGraph = GetGraph(TitleQuery.Single >> WikiApi.WikiApi().GetLinks)
+    let GetWikiGraph() = async.Return (Graph(""))

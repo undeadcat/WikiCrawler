@@ -3,9 +3,9 @@
 //TODO. kill extra.
 module Operators = 
     /// Inject a value into the monadic type
-    let inline returnM builder x = (((^M : (member Return : 'b -> 'c) (builder, x))))
+    let inline returnM builder x = ((((^M : (member Return : 'b -> 'c) (builder, x)))))
     
-    let inline bindM builder m f = (((^M : (member Bind : 'd -> ('e -> 'c) -> 'c) (builder, m, f))))
+    let inline bindM builder m f = ((((^M : (member Bind : 'd -> ('e -> 'c) -> 'c) (builder, m, f)))))
     
     let inline liftM builder f m = 
         let inline ret x = returnM builder (f x)
@@ -69,8 +69,8 @@ module Async =
     let foldM f s = Seq.fold (fun acc t -> acc >>= (flip f) t) (returnM s)
     
     let inline sequence s = 
-        let cons = curry List.Cons
+        let cons = flip (curry List.Cons)
         let inline cons a b = lift2 cons a b
-        List.foldBack cons s (returnM [])
+        Seq.fold cons (returnM []) s |> map List.rev
     
     let inline mapM f x = sequence (List.map f x)

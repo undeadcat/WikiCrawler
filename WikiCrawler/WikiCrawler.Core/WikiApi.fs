@@ -7,23 +7,22 @@ open Newtonsoft.Json
 open System.IO
 
 module WikiApi = 
-    //TODO. continuations
     //TODO. compression. how to enable
     //TODO. Canellation token.
-    //TODO. return choice?
+    //TODO. return choice instead of throwing
     type UriBuilder = WikiCrawler.Core.UriBuilder
     
-    type JsonLink() = 
-        [<JsonProperty("title")>]
-        member val Title = "" with get, set
-    
-    type JsonPage() = 
+    type private JsonContinueData() = 
         [<JsonProperty("links")>]
-        member val Links = ([||] : JsonLink []) with get, set
+        member val Links = new Dictionary<string, string>() with get, set
     
     type private JsonQuery() = 
+        
+        [<JsonProperty("query-continue")>]
+        member val ContinueData = new JsonContinueData() with get, set
+        
         [<JsonProperty("pages")>]
-        member val Pages = new Dictionary<string, JsonPage>() with get, set
+        member val Pages = new Dictionary<string, Page>() with get, set
     
     type private JsonError() = 
         
@@ -51,6 +50,34 @@ module WikiApi =
     type WikiApiException(message : string) = 
         inherit Exception(message)
     
+    type private Cursor(getNextBatch : (string * string) Option -> JsonQuery Async) = 
+        let mutable isFirstBatch = true
+        let mutable continuations : (string * string) list = []
+        
+        let getCurrent() : Page seq Async = 
+            let getPages (x : JsonQuery) = x.Pages.Values :> Page seq
+            isFirstBatch <- false
+            match continuations with
+            | [] -> getNextBatch None |> Async.map getPages
+            | (contKey, contValue) :: rest -> 
+                async { 
+                    let! queryResult = getNextBatch (Some(contKey, contValue))
+                    continuations <- queryResult.ContinueData.Links
+                                     |> Seq.map (fun x -> (x.Key, x.Value))
+                                     |> List.ofSeq
+                                     |> (@) rest
+                    return getPages queryResult
+                }
+        
+        let hasMore() = 
+            isFirstBatch || not (List.isEmpty continuations)
+        interface IEnumerator<Page seq Async> with
+            member __.MoveNext() = hasMore()
+            member __.Current : IEnumerable<Page> Async = getCurrent()
+            member __.Current : obj = getCurrent() :> obj
+            member __.Reset() : unit = raise (new NotSupportedException())
+            member __.Dispose() = ignore()
+    
     type WikiApi(executeRequest : HttpWebRequest -> HttpWebResponseWrapper Async) = 
         
         let baseUri = 
@@ -64,32 +91,42 @@ module WikiApi =
         let serializer = new JsonSerializer()
         let cookieContainer = new CookieContainer()
         
-        let createWebRequest (pageTitles : TitleQuery) = 
-            let req = WebRequest.Create(baseUri.With("titles", String.Join("|", pageTitles)).ToUri()) :?> HttpWebRequest
+        let createWebRequest (pageTitles : TitleQuery) (continuation : (String * String) option) = 
+            let uri = 
+                match continuation with
+                | None -> baseUri
+                | Some(key, value) -> baseUri.With(key, value)
+                |> fun x -> x.With("titles", String.Join("|", pageTitles))
+            
+            let req = WebRequest.Create(uri.ToUri()) :?> HttpWebRequest
             req.UserAgent <- "WikiCrawler/0.1 (WikiCrawler)"
             req.CookieContainer <- cookieContainer
             req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
             req
         
-        let deserialize (response : Stream) = 
-            serializer.Deserialize<JsonResponse>(new JsonTextReader(new StreamReader(response)))
-        
-        member __.GetLinks(pageTitle : TitleQuery) = 
+        let performRequest (pageTitle : TitleQuery) (continuation : (String * String) option) = 
             async { 
-                let req = createWebRequest pageTitle
+                let req = createWebRequest pageTitle continuation
                 let! res = executeRequest req
                 if res.StatusCode <> HttpStatusCode.OK then 
                     return raise (new WebException(sprintf "Invalid status code: %s" (res.StatusCode.ToString())))
-                let deserialized = res.Content |> deserialize
+                let deserialized = 
+                    serializer.Deserialize<JsonResponse>(new JsonTextReader(new StreamReader(res.Content)))
                 if not (String.IsNullOrWhiteSpace deserialized.Error.Code) then 
                     raise (new WikiApiException(sprintf "Error: %s %s" deserialized.Error.Code deserialized.Error.Info))
                 if deserialized.Warnings.Values.Count > 0 then 
                     deserialized.Warnings.Values
                     |> Seq.collect (fun x -> x.Values)
                     |> fun x -> raise (new WikiApiException("Warnings: " + String.Join("; ", x)))
-                return deserialized.Query.Pages.Values
-                       |> Seq.toList
+                return deserialized.Query
             }
+        
+        member __.GetLinks(pageTitle : TitleQuery) = 
+            { new IEnumerable<Page seq Async> with
+                  member this.GetEnumerator() : Collections.IEnumerator = 
+                      (this :> IEnumerable<_>).GetEnumerator() :> Collections.IEnumerator
+                  member __.GetEnumerator() : IEnumerator<Page seq Async> = 
+                      new Cursor(performRequest pageTitle) :> IEnumerator<_> }
         
         new() = 
             let executeHttpRequest (req : HttpWebRequest) = 
