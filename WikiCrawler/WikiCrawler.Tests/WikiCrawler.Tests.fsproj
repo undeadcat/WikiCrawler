@@ -59,11 +59,17 @@
     <None Include="App.config" />
     <Content Include="packages.config" />
     <Compile Include="Helpers.fs" />
+    <Compile Include="MockHttp.fs" />
     <Compile Include="GraphTests.fs" />
     <Compile Include="TitleQueryTests.fs" />
     <Compile Include="WikiApiTests.fs" />
+    <Compile Include="Class1.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Foq">
+      <HintPath>..\packages\Foq.1.6\Lib\net45\Foq.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>

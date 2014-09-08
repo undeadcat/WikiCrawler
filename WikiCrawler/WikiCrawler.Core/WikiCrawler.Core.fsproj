@@ -57,9 +57,10 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <None Include="App.config" />
-    <Compile Include="UriBuilder.fs" />
     <Compile Include="Common.fs" />
+    <Compile Include="UriBuilder.fs" />
     <Compile Include="Monads.fs" />
+    <Compile Include="Http.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="TitleQuery.fs" />
     <Compile Include="WikiApi.fs" />

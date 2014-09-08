@@ -17,10 +17,6 @@ module WikiApi =
         member val Links = new Dictionary<string, string>() with get, set
     
     type private JsonQuery() = 
-        
-        [<JsonProperty("query-continue")>]
-        member val ContinueData = new JsonContinueData() with get, set
-        
         [<JsonProperty("pages")>]
         member val Pages = new Dictionary<string, Page>() with get, set
     
@@ -40,45 +36,39 @@ module WikiApi =
         [<JsonProperty("warnings")>]
         member val Warnings = new Dictionary<string, Dictionary<string, string>>() with get, set
         
+        [<JsonProperty("query-continue")>]
+        member val ContinueData = new JsonContinueData() with get, set
+        
         [<JsonProperty("query")>]
         member val Query = new JsonQuery() with get, set
-    
-    type HttpWebResponseWrapper = 
-        { StatusCode : HttpStatusCode
-          Content : Stream }
     
     type WikiApiException(message : string) = 
         inherit Exception(message)
     
-    type private Cursor(getNextBatch : (string * string) Option -> JsonQuery Async) = 
-        let mutable isFirstBatch = true
-        let mutable continuations : (string * string) list = []
-        
-        let getCurrent() : Page seq Async = 
-            let getPages (x : JsonQuery) = x.Pages.Values :> Page seq
-            isFirstBatch <- false
-            match continuations with
-            | [] -> getNextBatch None |> Async.map getPages
-            | (contKey, contValue) :: rest -> 
-                async { 
-                    let! queryResult = getNextBatch (Some(contKey, contValue))
-                    continuations <- queryResult.ContinueData.Links
-                                     |> Seq.map (fun x -> (x.Key, x.Value))
-                                     |> List.ofSeq
-                                     |> (@) rest
-                    return getPages queryResult
-                }
-        
-        let hasMore() = 
-            isFirstBatch || not (List.isEmpty continuations)
-        interface IEnumerator<Page seq Async> with
-            member __.MoveNext() = hasMore()
-            member __.Current : IEnumerable<Page> Async = getCurrent()
-            member __.Current : obj = getCurrent() :> obj
-            member __.Reset() : unit = raise (new NotSupportedException())
-            member __.Dispose() = ignore()
+    type IResultCursor = 
+        abstract GetBatch : unit -> (Page list * IResultCursor Option) Async
     
-    type WikiApi(executeRequest : HttpWebRequest -> HttpWebResponseWrapper Async) = 
+    type private ResultCursor(continuations : (String * String) list, getNextBatch : (String * String) Option -> JsonResponse Async) = 
+        interface IResultCursor with
+            member __.GetBatch() : Async<Page list * Option<IResultCursor>> = 
+                let (resultAsync, oldContinuations) = 
+                    match continuations with
+                    | [] -> (getNextBatch None, [])
+                    | (contKey, contValue) :: rest -> (getNextBatch (Some(contKey, contValue)), rest)
+                async { 
+                    let! result = resultAsync
+                    let continuations = 
+                        result.ContinueData.Links
+                        |> Seq.map (fun x -> (x.Key, x.Value))
+                        |> List.ofSeq
+                        |> (@) oldContinuations
+                    
+                    let items = List.ofSeq result.Query.Pages.Values
+                    return if Seq.isEmpty continuations then (items, None)
+                           else (items, Some(ResultCursor(continuations, getNextBatch) :> IResultCursor))
+                }
+    
+    type WikiApi(executeRequest : IExecuteHttpRequest) = 
         
         let baseUri = 
             UriBuilder("http://en.wikipedia.org/w/api.php", 
@@ -107,7 +97,7 @@ module WikiApi =
         let performRequest (pageTitle : TitleQuery) (continuation : (String * String) option) = 
             async { 
                 let req = createWebRequest pageTitle continuation
-                let! res = executeRequest req
+                let! res = executeRequest.Execute req
                 if res.StatusCode <> HttpStatusCode.OK then 
                     return raise (new WebException(sprintf "Invalid status code: %s" (res.StatusCode.ToString())))
                 let deserialized = 
@@ -118,21 +108,17 @@ module WikiApi =
                     deserialized.Warnings.Values
                     |> Seq.collect (fun x -> x.Values)
                     |> fun x -> raise (new WikiApiException("Warnings: " + String.Join("; ", x)))
-                return deserialized.Query
+                return deserialized
             }
         
-        member __.GetLinks(pageTitle : TitleQuery) = 
-            { new IEnumerable<Page seq Async> with
-                  member this.GetEnumerator() : Collections.IEnumerator = 
-                      (this :> IEnumerable<_>).GetEnumerator() :> Collections.IEnumerator
-                  member __.GetEnumerator() : IEnumerator<Page seq Async> = 
-                      new Cursor(performRequest pageTitle) :> IEnumerator<_> }
-        
-        new() = 
-            let executeHttpRequest (req : HttpWebRequest) = 
-                req.AsyncGetResponse()
-                |> Async.map (fun x -> x :?> HttpWebResponse)
-                |> Async.map (fun x -> 
-                       { StatusCode = x.StatusCode
-                         Content = x.GetResponseStream() })
-            new WikiApi(executeHttpRequest)
+        member __.GetLinks(pageTitle : TitleQuery) = new ResultCursor([], performRequest pageTitle) :> IResultCursor
+        static member RunToCompletion cursor = 
+            let rec inner (cursor : IResultCursor) (res : Page seq) = 
+                async { 
+                    let! (pages, continuation) = cursor.GetBatch()
+                    let newPages = Seq.append res pages
+                    match continuation with
+                    | None -> return newPages
+                    | Some(cursor) -> return! inner cursor newPages
+                }
+            inner cursor []
