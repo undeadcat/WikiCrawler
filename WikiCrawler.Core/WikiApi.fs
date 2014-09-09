@@ -5,7 +5,6 @@ open System
 open System.Collections.Generic
 open Newtonsoft.Json
 open System.IO
-open System.Web
 
 module WikiApi = 
     type UriBuilder = WikiCrawler.Core.UriBuilder

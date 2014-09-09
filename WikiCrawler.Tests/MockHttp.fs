@@ -1,7 +1,6 @@
 ﻿namespace WikiCrawler.Tests
 
 open System.Net
-open System.Web
 open System.IO
 open System.Text
 open System
