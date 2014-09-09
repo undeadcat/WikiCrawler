@@ -13,16 +13,23 @@ type NodeWithEdges<'T> =
     { Node : 'T
       Edges : 'T list }
 
-type Graph<'T when 'T : comparison>(root : 'T, keyComparer : IEqualityComparer<'T>) = 
-    let adjacent = new ConcurrentDictionary<'T, 'T list>(keyComparer)
+type Graph<'T when 'T : comparison> private (root : 'T, adjacent : Map<'T, 'T Set>, keyComparer : IEqualityComparer<'T>) = 
     
-    member __.AddLink one two = 
-        adjacent.AddOrUpdate(one, [ two ], fun _ oldValue -> two :: oldValue) |> ignore
-        adjacent.AddOrUpdate(two, [], fun _ oldValue -> oldValue) |> ignore
+    let getValue key = 
+        match Map.tryFind key adjacent with
+        | None -> Set([])
+        | Some(v) -> v
+    
+    new(root, comparer) = Graph(root, Map([]), comparer)
+    
+    member __.AddLink(one, two) = 
+        let oneValue = getValue one
+        let twoValue = getValue two
+        Graph(root, adjacent.Add(one, oneValue.Add(two)).Add(two, twoValue), keyComparer)
     
     member __.Adjacent = 
         adjacent
-        |> Seq.map (fun pair -> (pair.Key, List.rev pair.Value))
+        |> Seq.map (fun pair -> (pair.Key, Set.toList pair.Value))
         |> List.ofSeq
     
     member __.Root = root
@@ -30,25 +37,25 @@ type Graph<'T when 'T : comparison>(root : 'T, keyComparer : IEqualityComparer<'
 module GraphModule = 
     let GetGraph<'T when 'T : comparison> (getNodes : 'T list -> NodeWithEdges<'T> list Async) (nodeComparer) 
         (startNode : 'T) (maxDepth : int) = 
-        let graph = new Graph<_>(startNode, nodeComparer)
-        let visited = new HashSet<'T>(nodeComparer : IEqualityComparer<'T>)
-        
-        let rec inner nodes depth = 
-            if depth > maxDepth then async.Return(graph)
+        let rec inner (graph : Graph<'T>) (visited : Set<'T>) nodes depth = 
+            if depth > maxDepth || Seq.isEmpty nodes then async.Return(graph)
             else 
-                List.iter (fun x -> visited.Add(x) |> ignore) nodes
-                let asyncResult = nodes |> getNodes
                 async { 
-                    let! nodes = asyncResult
-                    //TODO. chain method.
-                    List.iter (fun x -> x.Edges |> List.iter (fun y -> graph.AddLink x.Node y)) nodes
+                    let! nodes = nodes |> getNodes
+                    let newGraph = 
+                        nodes
+                        |> List.collect (fun x -> List.map (fun e -> (x.Node, e)) x.Edges)
+                        |> List.fold (fun g i -> (g : Graph<'T>).AddLink(i)) graph
+                    
+                    let newVisited = nodes |> List.fold (fun v i -> Set.add i.Node v) visited
+                    
                     let newFront = 
                         nodes
                         |> List.collect (fun x -> x.Edges)
-                        |> List.filter (visited.Contains >> not)
-                    return! inner newFront (depth + 1)
+                        |> List.filter (newVisited.Contains >> not)
+                    return! inner newGraph newVisited newFront (depth + 1)
                 }
-        inner [ startNode ] 1
+        inner (Graph(startNode, nodeComparer)) (Set([])) [ startNode ] 1
     
     let GetWikiGraph (startPage : String) maxDepth = 
         let api = WikiApi(HttpProxy())
@@ -58,15 +65,13 @@ module GraphModule =
               Edges = page.Links |> List.map (fun x -> x.Title) }
         
         let getNodes nodes = 
-            let result = 
-                nodes
-                |> Seq.filter (String.IsNullOrWhiteSpace >> not)
-                |> TitleQuery.Create
-                |> Seq.map (api.GetLinks >> WikiApi.RunToCompletion)
-                |> Async.Parallel
-                |> Async.map (Seq.collect id
-                              >> Seq.map ToNode
-                              >> List.ofSeq)
-            result
+            nodes
+            |> Seq.filter (String.IsNullOrWhiteSpace >> not)
+            |> TitleQuery.Create
+            |> Seq.map (api.GetLinks >> WikiApi.RunToCompletion)
+            |> Async.Parallel
+            |> Async.map (Seq.collect id
+                          >> Seq.map ToNode
+                          >> List.ofSeq)
         
         GetGraph<String> getNodes StringComparer.InvariantCultureIgnoreCase startPage maxDepth

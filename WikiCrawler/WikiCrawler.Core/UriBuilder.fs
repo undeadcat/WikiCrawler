@@ -1,6 +1,7 @@
 ﻿namespace WikiCrawler.Core
 
 open System
+open System.Net
 
 type UriBuilder(baseUri : String, query : (string * string) list) = 
     
@@ -8,7 +9,7 @@ type UriBuilder(baseUri : String, query : (string * string) list) =
         if List.isEmpty query then String.Empty
         else 
             query
-            |> List.map (fun (key, value) -> sprintf "%s=%s" key value)
+            |> List.map (fun (key, value) -> sprintf "%s=%s" (WebUtility.UrlEncode(key)) (WebUtility.UrlEncode(value)))
             |> fun x -> String.Join("&", x)
     
     member __.With(pair) = new UriBuilder(baseUri, (pair :: query))

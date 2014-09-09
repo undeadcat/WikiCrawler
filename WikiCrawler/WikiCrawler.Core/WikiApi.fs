@@ -59,13 +59,7 @@ module WikiApi =
     type IResultCursor = 
         abstract GetBatch : unit -> (JsonPage list * IResultCursor Option) Async
     
-    type private ResultCursor(continuations : (String * String) list, getNextBatch : (String * String) Option -> JsonResponse Async) = 
-        
-        let ToPages(pairs: Dictionary<int, JsonPage>) = 
-            pairs
-             |>Seq.filter (fun x-> x.Key > 0 )
-             |> Seq.map (fun x->x.Value)
-             |> Seq.toList
+    type private ResultCursor(continuations : (String * String) list, getNextBatch : (String * String) Option -> (JsonContinueData * JsonPage list) Async) = 
         
         interface IResultCursor with
             member __.GetBatch() : Async<JsonPage list * Option<IResultCursor>> = 
@@ -74,16 +68,15 @@ module WikiApi =
                     | [] -> (getNextBatch None, [])
                     | (contKey, contValue) :: rest -> (getNextBatch (Some(contKey, contValue)), rest)
                 async { 
-                    let! result = resultAsync
+                    let! (continueData, pages) = resultAsync
                     let continuations = 
-                        result.ContinueData.Links
+                        continueData.Links
                         |> Seq.map (fun x -> (x.Key, x.Value))
                         |> List.ofSeq
                         |> (@) oldContinuations
                     
-                    let items = ToPages result.Query.Pages
-                    return if Seq.isEmpty continuations then (items, None)
-                           else (items, Some(ResultCursor(continuations, getNextBatch) :> IResultCursor))
+                    return if Seq.isEmpty continuations then (pages, None)
+                           else (pages, Some(ResultCursor(continuations, getNextBatch) :> IResultCursor))
                 }
     
     type WikiApi(executeRequest : IExecuteHttpRequest) = 
@@ -94,6 +87,7 @@ module WikiApi =
                          ("prop", "links")
                          ("redirects", "true")
                          ("format", "json")
+                         ("plnamespace", "0")
                          ("pllimit", "500") ])
         
         let serializer = new JsonSerializer()
@@ -104,7 +98,7 @@ module WikiApi =
                 match continuation with
                 | None -> baseUri
                 | Some(key, value) -> baseUri.With(key, value)
-                |> fun x -> x.With("titles", WebUtility.UrlEncode(String.Join("|", pageTitles)))
+                |> fun x -> x.With("titles", String.Join("|", pageTitles))
             
             let req = WebRequest.Create(uri.ToUri()) :?> HttpWebRequest
             req.UserAgent <- "WikiCrawler/0.1 (WikiCrawler)"
@@ -114,22 +108,27 @@ module WikiApi =
             req.Headers.Item("Cache-Control")<-"max-age=5"
             req.AutomaticDecompression <- DecompressionMethods.Deflate ||| DecompressionMethods.GZip
             req
-        
+
         let performRequest (pageTitle : TitleQuery) (continuation : (String * String) option) = 
             async { 
                 let req = createWebRequest pageTitle continuation
                 let! res = executeRequest.Execute req
                 if res.StatusCode <> HttpStatusCode.OK then 
                     return raise (new WebException(sprintf "Invalid status code: %s" (res.StatusCode.ToString())))
-                let deserialized = 
+                let response = 
                     serializer.Deserialize<JsonResponse>(new JsonTextReader(new StreamReader(res.Content)))
-                if not (String.IsNullOrWhiteSpace deserialized.Error.Code) then 
-                    raise (new WikiApiException(sprintf "Error: %s %s" deserialized.Error.Code deserialized.Error.Info))
-                if deserialized.Warnings.Values.Count > 0 then 
-                    deserialized.Warnings.Values
+                if not (String.IsNullOrWhiteSpace response.Error.Code) then 
+                    raise (new WikiApiException(sprintf "Error: %s %s" response.Error.Code response.Error.Info))
+                if response.Warnings.Values.Count > 0 then 
+                    response.Warnings.Values
                     |> Seq.collect (fun x -> x.Values)
                     |> fun x -> raise (new WikiApiException("Warnings: " + String.Join("; ", x)))
-                return deserialized
+                let continueData = response.ContinueData
+                let pages = response.Query.Pages 
+                                |> Seq.filter (fun x->x.Key> 0) 
+                                |> Seq.map (fun x->x.Value)
+                                |> List.ofSeq
+                return (continueData,pages)
             }
         
         member __.GetLinks(pageTitle : TitleQuery) = new ResultCursor([], performRequest pageTitle) :> IResultCursor

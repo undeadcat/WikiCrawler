@@ -20,12 +20,13 @@ type WikiApiTests() =
     member __.InvalidStatusCode_ThrowException() = 
         let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.BadGateway, ""))
         Assert.Throws<WebException, _>(fun () -> doTest setup [ "a" ])
+    
     [<Test>]
-    member __.ParametersUrlEncoded() =
+    member __.ParametersUrlEncoded() = 
         let spacedTitle = "Some spaced title with ampersand & ampersand"
-        let setup = MockHttp().Setup(It.IsQueryContaining("titles", spacedTitle).Returns(HttpStatusCode.OK, "{}"))
-        Assert.That(doTest setup [spacedTitle], Is.Empty)
-
+        let setup = MockHttp().Setup(It.IsQueryContaining("titles", spacedTitle).ReturnsOk("{}"))
+        Assert.That(doTest setup [ spacedTitle ], Is.Empty)
+    
     [<Test>]
     member __.SimpleGetLinks() = 
         let content = @"{
@@ -56,7 +57,7 @@ type WikiApiTests() =
                             }
                         }
                     }"
-        let setup = MockHttp().Setup(It.IsQueryContaining("titles", "cat|dog").Returns(HttpStatusCode.OK, content))
+        let setup = MockHttp().Setup(It.IsQueryContaining("titles", "cat|dog").ReturnsOk(content))
         let actual = doTest setup [ "Cat"; "Dog" ]
         
         let expected = 
@@ -74,7 +75,7 @@ type WikiApiTests() =
                                 ""*"": ""two""
                             }
                         }"
-        let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, sprintf @"{""warnings"":%s }" warnings))
+        let setup = MockHttp().Setup(It.IsAny().ReturnsOk(sprintf @"{""warnings"":%s }" warnings))
         Assert.Throws
             (Exception.OfType<WikiApiException>().WithMessage("Warnings: one; two"), (fun () -> doTest setup [ "a" ]))
     
@@ -86,7 +87,7 @@ type WikiApiTests() =
                                 ""info"": ""info""
                             }
                         }"
-        let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, errors))
+        let setup = MockHttp().Setup(It.IsAny().ReturnsOk(errors))
         Assert.Throws
             (Exception.OfType<WikiApiException>().WithMessage("Error: code info"), (fun () -> doTest setup [ "a" ]))
     
@@ -102,7 +103,7 @@ type WikiApiTests() =
                         }
                     }
                 }"
-        let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, res))
+        let setup = MockHttp().Setup(It.IsAny().ReturnsOk(res))
         let actual = doTest setup [ "a" ]
         Assert.That(actual, Is.Empty)
     
@@ -149,8 +150,8 @@ type WikiApiTests() =
         }"
         let query = It.IsQueryContaining("titles", "cat")
         let setup = 
-            MockHttp().Setup(query.QueryNotContains("continueKey").Returns(HttpStatusCode.OK, request1))
-                .Setup(query.QueryContains("continueKey", "continueValue").Returns(HttpStatusCode.OK, request2))
+            MockHttp().Setup(query.QueryNotContains("continueKey").ReturnsOk(request1))
+                .Setup(query.QueryContains("continueKey", "continueValue").ReturnsOk(request2))
         let actual = doTest setup [ "cat" ]
         
         let expected = 

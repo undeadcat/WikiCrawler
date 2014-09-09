@@ -36,8 +36,9 @@ type HttpSetupBuilder(condition, result : HttpWebResponseWrapper option) =
         let newCondition (req : HttpWebRequest) = not (parseQuery(req.RequestUri.Query).ContainsKey(key))
         HttpSetupBuilder((fun x -> condition x && newCondition x), result)
     
-    member __.Returns(statusCode, requestBody) = 
-        HttpSetupBuilder(condition, Some(getResponse (statusCode, requestBody)))
+    member __.Returns(statusCode, responseBodu) = 
+        HttpSetupBuilder(condition, Some(getResponse (statusCode, responseBodu)))
+    member this.ReturnsOk(body) = this.Returns(HttpStatusCode.OK, body)
 
 module It = 
     let IsAny() = HttpSetupBuilder((fun _ -> true), None)
