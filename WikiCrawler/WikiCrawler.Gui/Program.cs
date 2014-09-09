@@ -10,8 +10,6 @@ using WikiCrawler.Core;
 
 namespace WikiCrawler.Gui
 {
-	//TODO. make ui responsive.
-	//TODO. update graph with async feedback.
 	public class Program
 	{
 		[STAThread]
@@ -21,9 +19,10 @@ namespace WikiCrawler.Gui
 			var subscription = FromTextChanged(form.DepthText)
 				.Where(CanParseInt)
 				.Select(int.Parse)
+				.Where(x => x > 0)
 				.CombineLatest(FromTextChanged(form.StartPageText), (d, p) => new { Page = p, Depth = d })
 				.DistinctUntilChanged()
-				.Select(x => Observable.FromAsync(() => GraphModule.GetWikiGraph(x.Page, x.Depth).ToTask()))
+				.Select(x => Observable.FromAsync(token => GraphModule.GetWikiGraph(x.Page, x.Depth).ToTask(token)))
 				.Switch()
 				.ObserveOn(SynchronizationContext.Current)
 				.Select(ConvertGraph)
@@ -36,10 +35,15 @@ namespace WikiCrawler.Gui
 		private static Graph ConvertGraph(Graph<string> arg)
 		{
 			var graph = new Graph("graph")
-			{
-				GraphAttr = new GraphAttr { NodeAttribute = new NodeAttr { Shape = Shape.Plaintext },LayerDirection = LayerDirection.TB, LayerSep = 100},
-				Directed = true,
-			};
+							{
+								GraphAttr = new GraphAttr
+												{
+													NodeAttribute = new NodeAttr { Shape = Shape.Plaintext }, 
+													LayerDirection = LayerDirection.TB, 
+													LayerSep = 500
+												},
+								Directed = true,
+							};
 			foreach (var tuple in arg.Adjacent.SelectMany(x => x.Item2.Select(y => new { One = x.Item1, Two = y })))
 				graph.AddEdge(tuple.One, tuple.Two);
 			return graph;

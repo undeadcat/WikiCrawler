@@ -7,9 +7,9 @@ namespace WikiCrawler.Gui
 {
 	public static class FSharpInterop
 	{
-		public static Task<T> ToTask<T>(this FSharpAsync<T> fSharpAsync)
+		public static Task<T> ToTask<T>(this FSharpAsync<T> fSharpAsync, CancellationToken cancellationToken)
 		{
-			return FSharpAsync.StartAsTask(fSharpAsync, FSharpOption<TaskCreationOptions>.None, FSharpOption<CancellationToken>.None);
+			return FSharpAsync.StartAsTask(fSharpAsync, FSharpOption<TaskCreationOptions>.None, FSharpOption<CancellationToken>.Some(cancellationToken));
 		}
 	}
 }

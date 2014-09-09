@@ -63,7 +63,6 @@
     <Compile Include="GraphTests.fs" />
     <Compile Include="TitleQueryTests.fs" />
     <Compile Include="WikiApiTests.fs" />
-    <Compile Include="Class1.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Foq">

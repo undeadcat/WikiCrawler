@@ -58,7 +58,7 @@
   <ItemGroup>
     <None Include="App.config" />
     <Compile Include="Common.fs" />
-    <Compile Include="Collections.fs" />
+    <Compile Include="Comparable.fs" />
     <Compile Include="UriBuilder.fs" />
     <Compile Include="Monads.fs" />
     <Compile Include="Http.fs" />

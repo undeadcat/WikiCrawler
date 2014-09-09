@@ -1,9 +1,7 @@
 ﻿namespace WikiCrawler.Core
 
-//TODO. can get different case. test
 //TODO. can get duplicates from api. dict values need to be sets.
-//TODO. first page doesn't exist
-//TODO. first page is null or whitespace
+//TODO. Redirects.
 open System.Collections.Concurrent
 open WikiCrawler.Core.WikiApi
 open System.Collections.Generic
@@ -13,26 +11,34 @@ type NodeWithEdges<'T> =
     { Node : 'T
       Edges : 'T list }
 
-type Graph<'T when 'T : comparison> private (root : 'T, adjacent : Map<'T, 'T Set>, keyComparer : IEqualityComparer<'T>) = 
+type Graph<'T when 'T : comparison> private (adjacent : Map<Comparable<'T>, Comparable<'T> Set>, comparer : IComparer<'T>) = 
     
     let getValue key = 
         match Map.tryFind key adjacent with
         | None -> Set([])
         | Some(v) -> v
     
-    new(root, comparer) = Graph(root, Map([]), comparer)
+    new(comparer) = Graph(Map<_, _>([]), comparer)
     
-    member __.AddLink(one, two) = 
-        let oneValue = getValue one
-        let twoValue = getValue two
-        Graph(root, adjacent.Add(one, oneValue.Add(two)).Add(two, twoValue), keyComparer)
+    member __.AddNode(node) = 
+        let node = Comparable(node, comparer)
+        Graph(adjacent.Add(node, Set([])), comparer)
+    
+    member __.AddLink(one : 'T, two : 'T) = 
+        let one = Comparable(one, comparer)
+        let two = Comparable(two, comparer)
+        let oneAdj = getValue one
+        let twoAdj = getValue two
+        Graph(adjacent.Add(one, oneAdj.Add(two)).Add(two, twoAdj), comparer)
     
     member __.Adjacent = 
         adjacent
-        |> Seq.map (fun pair -> (pair.Key, Set.toList pair.Value))
+        |> Seq.map (fun pair -> 
+               (pair.Key.Value, 
+                pair.Value
+                |> Set.toList
+                |> List.map (fun x -> x.Value)))
         |> List.ofSeq
-    
-    member __.Root = root
 
 module GraphModule = 
     let GetGraph<'T when 'T : comparison> (getNodes : 'T list -> NodeWithEdges<'T> list Async) (nodeComparer) 
@@ -42,11 +48,10 @@ module GraphModule =
             else 
                 async { 
                     let! nodes = nodes |> getNodes
-                    let newGraph = 
-                        nodes
-                        |> List.collect (fun x -> List.map (fun e -> (x.Node, e)) x.Edges)
-                        |> List.fold (fun g i -> (g : Graph<'T>).AddLink(i)) graph
-                    
+                    let processNode (graph : Graph<'T>) (node : NodeWithEdges<'T>) = 
+                        node.Edges 
+                        |> List.fold (fun g i -> (g : Graph<'T>).AddLink(node.Node, i)) (graph.AddNode(node.Node))
+                    let newGraph = List.fold processNode graph nodes
                     let newVisited = nodes |> List.fold (fun v i -> Set.add i.Node v) visited
                     
                     let newFront = 
@@ -55,7 +60,7 @@ module GraphModule =
                         |> List.filter (newVisited.Contains >> not)
                     return! inner newGraph newVisited newFront (depth + 1)
                 }
-        inner (Graph(startNode, nodeComparer)) (Set([])) [ startNode ] 1
+        inner (Graph(nodeComparer)) (Set([])) [ startNode ] 1
     
     let GetWikiGraph (startPage : String) maxDepth = 
         let api = WikiApi(HttpProxy())

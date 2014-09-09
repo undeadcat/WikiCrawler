@@ -5,8 +5,6 @@ open System
 
 type Comparable<'T>(value : 'T, comparer : IComparer<'T>) = 
     member __.Value = value
-    override this.Equals(obj) = 
-        (this :> IComparable).CompareTo(obj) = 0
     
     interface IComparable with
         member this.CompareTo(obj : obj) : int = 
