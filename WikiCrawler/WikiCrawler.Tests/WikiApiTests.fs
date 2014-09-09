@@ -13,6 +13,7 @@ type WikiApiTests() =
         WikiApi(mockHttp.Moq.Create()).GetLinks(TitleQuery.Create titles |> Seq.nth 0)
         |> WikiApi.RunToCompletion
         |> Async.RunSynchronously
+        |> Seq.map (fun x -> (x.Title, x.Links |> List.map (fun x -> x.Title)))
     
     [<Test>]
     member __.InvalidStatusCode_ThrowException() = 
@@ -52,7 +53,9 @@ type WikiApiTests() =
         let setup = MockHttp().Setup(It.IsQueryContaining("titles", "cat|dog").Returns(HttpStatusCode.OK, content))
         let actual = doTest setup [ "Cat"; "Dog" ]
         
-        let expected = [ Page( "Cat",[ { Title = "Fat cat" } ]); Page("Dog",[ { Title = "Bad wolf" } ]) ]
+        let expected = 
+            [ ("Cat", [ "Fat cat" ])
+              ("Dog", [ "Bad wolf" ]) ]
         Assert.That(actual, Is.EqualTo(expected))
     
     [<Test>]
@@ -95,7 +98,7 @@ type WikiApiTests() =
                 }"
         let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.OK, res))
         let actual = doTest setup [ "a" ]
-        Assert.That(actual, Is.EqualTo([NotFound("a")]))
+        Assert.That(actual, Is.Empty)
     
     [<Test>]
     member __.Continuation() = 
@@ -145,5 +148,6 @@ type WikiApiTests() =
         let actual = doTest setup [ "cat" ]
         
         let expected = 
-            [ Page("firstRequest",[ { Title = "link1" } ]);Page("secondRequest",[ { Title = "link2" } ]) ]
+            [ ("firstRequest", [ "link1" ])
+              ("secondRequest", [ "link2" ]) ]
         Assert.That(actual, Is.EqualTo(expected))

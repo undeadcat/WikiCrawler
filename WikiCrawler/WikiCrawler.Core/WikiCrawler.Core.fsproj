@@ -61,7 +61,6 @@
     <Compile Include="UriBuilder.fs" />
     <Compile Include="Monads.fs" />
     <Compile Include="Http.fs" />
-    <Compile Include="Model.fs" />
     <Compile Include="TitleQuery.fs" />
     <Compile Include="WikiApi.fs" />
     <Compile Include="Graph.fs" />

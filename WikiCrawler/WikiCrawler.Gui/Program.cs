@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Glee.Drawing;
 using Microsoft.Glee.GraphViewerGdi;
+using WikiCrawler.Core;
 
 namespace WikiCrawler.Gui
 {
@@ -21,7 +22,7 @@ namespace WikiCrawler.Gui
 				.Select(int.Parse)
 				.CombineLatest(FromTextChanged(form.StartPageText), (d, p) => new { Page = p, Depth = d })
 				.DistinctUntilChanged()
-				.Select(x => Observable.FromAsync(() => Core.Graph.GetWikiGraph().ToTask()))
+				.Select(x => Observable.FromAsync(() => GraphModule.GetWikiGraph(x.Page, x.Depth).ToTask()))
 				.Switch()
 				.ObserveOn(SynchronizationContext.Current)
 				.Select(ConvertGraph)
@@ -31,7 +32,7 @@ namespace WikiCrawler.Gui
 				Application.Run(form.Form);
 		}
 
-		private static Graph ConvertGraph(Core.Graph.Graph<string> arg)
+		private static Graph ConvertGraph(Graph<string> arg)
 		{
 			var res = new Graph("graph");
 			foreach (var tuple in arg.Adjacent.SelectMany(x => x.Item2.Select(y => new { One = x.Item1, Two = y })))
@@ -44,7 +45,8 @@ namespace WikiCrawler.Gui
 			return Observable.FromEventPattern(
 											   x => textBox.TextChanged += x,
 											   x => textBox.TextChanged -= x)
-							 .Select(x => ((TextBox) x.Sender).Text);
+							 .Select(x => ((TextBox) x.Sender).Text)
+							 .Where(x => !String.IsNullOrWhiteSpace(x));
 		}
 
 		private static bool CanParseInt(string s)

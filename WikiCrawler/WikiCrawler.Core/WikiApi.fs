@@ -8,14 +8,13 @@ open System.IO
 
 module WikiApi = 
     //TODO. Canellation token.
-    //TODO. return choice instead of throwing?
     type UriBuilder = WikiCrawler.Core.UriBuilder
     
-    type private JsonLink() = 
+    type JsonLink() = 
         [<JsonProperty("title")>]
         member val Title = "" with get, set
     
-    type private JsonPage() = 
+    type JsonPage() = 
         
         [<JsonProperty("title")>]
         member val Title = "" with get, set
@@ -57,16 +56,18 @@ module WikiApi =
         inherit Exception(message)
     
     type IResultCursor = 
-        abstract GetBatch : unit -> (Page list * IResultCursor Option) Async
+        abstract GetBatch : unit -> (JsonPage list * IResultCursor Option) Async
     
     type private ResultCursor(continuations : (String * String) list, getNextBatch : (String * String) Option -> JsonResponse Async) = 
         
-        let ToPage(pair : KeyValuePair<int, JsonPage>) = 
-            if pair.Key < 0 then NotFound(pair.Value.Title)
-            else Page(pair.Value.Title, pair.Value.Links |> List.map (fun x -> { Title = x.Title }))
+        let ToPages(pairs: Dictionary<int, JsonPage>) = 
+            pairs
+             |>Seq.filter (fun x-> x.Key > 0 )
+             |> Seq.map (fun x->x.Value)
+             |> Seq.toList
         
         interface IResultCursor with
-            member __.GetBatch() : Async<Page list * Option<IResultCursor>> = 
+            member __.GetBatch() : Async<JsonPage list * Option<IResultCursor>> = 
                 let (resultAsync, oldContinuations) = 
                     match continuations with
                     | [] -> (getNextBatch None, [])
@@ -79,11 +80,7 @@ module WikiApi =
                         |> List.ofSeq
                         |> (@) oldContinuations
                     
-                    let items = 
-                        result.Query.Pages
-                        |> Seq.map ToPage
-                        |> List.ofSeq
-                    
+                    let items = ToPages result.Query.Pages
                     return if Seq.isEmpty continuations then (items, None)
                            else (items, Some(ResultCursor(continuations, getNextBatch) :> IResultCursor))
                 }
@@ -136,7 +133,7 @@ module WikiApi =
         
         member __.GetLinks(pageTitle : TitleQuery) = new ResultCursor([], performRequest pageTitle) :> IResultCursor
         static member RunToCompletion cursor = 
-            let rec inner (cursor : IResultCursor) (res : Page seq) = 
+            let rec inner (cursor : IResultCursor) (res : JsonPage seq) = 
                 async { 
                     let! (pages, continuation) = cursor.GetBatch()
                     let newPages = Seq.append res pages
