@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open Newtonsoft.Json
 open System.IO
+open System.Web
 
 module WikiApi = 
     //TODO. Canellation token.
@@ -103,7 +104,7 @@ module WikiApi =
                 match continuation with
                 | None -> baseUri
                 | Some(key, value) -> baseUri.With(key, value)
-                |> fun x -> x.With("titles", String.Join("|", pageTitles))
+                |> fun x -> x.With("titles", WebUtility.UrlEncode(String.Join("|", pageTitles)))
             
             let req = WebRequest.Create(uri.ToUri()) :?> HttpWebRequest
             req.UserAgent <- "WikiCrawler/0.1 (WikiCrawler)"

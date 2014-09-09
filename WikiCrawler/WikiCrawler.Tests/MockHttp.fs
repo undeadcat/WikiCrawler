@@ -1,6 +1,7 @@
 ﻿namespace WikiCrawler.Tests
 
 open System.Net
+open System.Web
 open System.IO
 open System.Text
 open System
@@ -11,10 +12,10 @@ open Foq
 type HttpSetupBuilder(condition, result : HttpWebResponseWrapper option) = 
     
     let parseQuery (query : String) = 
-        let nvc = new Dictionary<string, string>()
-        WebUtility.UrlDecode(query).TrimStart('?').Split('&')
+        let nvc = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase)
+        query.TrimStart('?').Split('&')
         |> Array.map (fun x -> x.Split('='))
-        |> Array.iter (fun x -> nvc.Add(x.[0], x.[1]))
+        |> Array.iter (fun x -> nvc.Add(WebUtility.UrlDecode(x.[0]), WebUtility.UrlDecode(x.[1])))
         nvc
     
     let getResponse (statusCode, stringBody : string) = 
@@ -27,7 +28,8 @@ type HttpSetupBuilder(condition, result : HttpWebResponseWrapper option) =
     member __.QueryContains(key, value) = 
         let newCondition (req : HttpWebRequest) = 
             let (success, actual) = parseQuery(req.RequestUri.Query).TryGetValue(key)
-            success && actual.EqualsIgnoringCase(value)
+            let res = success && actual.EqualsIgnoringCase(value)
+            res
         HttpSetupBuilder((fun x -> condition x && newCondition x), result)
     
     member __.QueryNotContains(key) = 

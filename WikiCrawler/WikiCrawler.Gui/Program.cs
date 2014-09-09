@@ -14,6 +14,7 @@ namespace WikiCrawler.Gui
 	//TODO. update graph with async feedback.
 	public class Program
 	{
+		[STAThread]
 		public static void Main()
 		{
 			var form = CreateForm();
@@ -34,10 +35,14 @@ namespace WikiCrawler.Gui
 
 		private static Graph ConvertGraph(Graph<string> arg)
 		{
-			var res = new Graph("graph");
+			var graph = new Graph("graph")
+			{
+				GraphAttr = new GraphAttr { NodeAttribute = new NodeAttr { Shape = Shape.Plaintext },LayerDirection = LayerDirection.TB, LayerSep = 100},
+				Directed = true,
+			};
 			foreach (var tuple in arg.Adjacent.SelectMany(x => x.Item2.Select(y => new { One = x.Item1, Two = y })))
-				res.AddEdge(tuple.One, tuple.Two);
-			return res;
+				graph.AddEdge(tuple.One, tuple.Two);
+			return graph;
 		}
 
 		private static IObservable<string> FromTextChanged(TextBox textBox)
@@ -55,26 +60,11 @@ namespace WikiCrawler.Gui
 			return int.TryParse(s, out _);
 		}
 
-		private static Graph CreateGraph()
-		{
-			var graph = new Graph("graph")
-							{
-								GraphAttr = new GraphAttr { NodeAttribute = new NodeAttr { Shape = Shape.Plaintext } },
-								Directed = true
-							};
-			var random = new Random();
-			const int count = 100;
-			var nodes = Enumerable.Range(0, count).Select(x => x.ToString()).ToArray();
-			for (var i = 0; i < count; i++)
-				graph.AddEdge(nodes[random.Next(count)], nodes[random.Next(count)]);
-			return graph;
-		}
-
 		private static FormContent CreateForm()
 		{
 			var startPageText = new TextBox { Name = "StartPage", Width = 150 };
 			var depthText = new TextBox { Name = "Depth", Width = 50 };
-			var viewer = new GViewer { Dock = DockStyle.Fill, Graph = CreateGraph() };
+			var viewer = new GViewer { Dock = DockStyle.Fill, Graph = new Graph("someGraph") };
 			var layoutPanel = new TableLayoutPanel
 								  {
 									  Dock = DockStyle.Fill,

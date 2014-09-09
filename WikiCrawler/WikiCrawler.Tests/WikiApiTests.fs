@@ -4,6 +4,7 @@ open NUnit.Framework
 open WikiCrawler.Core
 open WikiCrawler.Core.WikiApi
 open System.Net
+open System.Web
 open WikiCrawler.Tests.Helpers
 
 [<TestFixture>]
@@ -19,7 +20,12 @@ type WikiApiTests() =
     member __.InvalidStatusCode_ThrowException() = 
         let setup = MockHttp().Setup(It.IsAny().Returns(HttpStatusCode.BadGateway, ""))
         Assert.Throws<WebException, _>(fun () -> doTest setup [ "a" ])
-    
+    [<Test>]
+    member __.ParametersUrlEncoded() =
+        let spacedTitle = "Some spaced title with ampersand & ampersand"
+        let setup = MockHttp().Setup(It.IsQueryContaining("titles", spacedTitle).Returns(HttpStatusCode.OK, "{}"))
+        Assert.That(doTest setup [spacedTitle], Is.Empty)
+
     [<Test>]
     member __.SimpleGetLinks() = 
         let content = @"{
