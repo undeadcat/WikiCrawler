@@ -8,7 +8,6 @@ open System.IO
 open System.Web
 
 module WikiApi = 
-    //TODO. Canellation token.
     type UriBuilder = WikiCrawler.Core.UriBuilder
     
     type JsonLink() = 
@@ -85,7 +84,6 @@ module WikiApi =
             UriBuilder("http://en.wikipedia.org/w/api.php", 
                        [ ("action", "query")
                          ("prop", "links")
-                         ("redirects", "true")
                          ("format", "json")
                          ("plnamespace", "0")
                          ("pllimit", "500") ])

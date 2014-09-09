@@ -1,7 +1,5 @@
 ﻿namespace WikiCrawler.Core
 
-//TODO. can get duplicates from api. dict values need to be sets.
-//TODO. Redirects.
 open System.Collections.Concurrent
 open WikiCrawler.Core.WikiApi
 open System.Collections.Generic

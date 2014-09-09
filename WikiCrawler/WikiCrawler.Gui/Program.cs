@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Glee.Drawing;
@@ -85,7 +86,8 @@ namespace WikiCrawler.Gui
 			var form = new Form
 						   {
 							   WindowState = FormWindowState.Maximized,
-							   Controls = { layoutPanel }
+							   Controls = { layoutPanel },
+							   Text = Assembly.GetExecutingAssembly().GetName().Name
 						   };
 			return new FormContent { Form = form, DepthText = depthText, StartPageText = startPageText, Viewer = viewer };
 		}
