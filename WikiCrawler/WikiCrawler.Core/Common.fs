@@ -12,3 +12,7 @@ module Common =
     
     type String with
         member this.EqualsIgnoringCase(other) = this.Equals(other, StringComparison.InvariantCultureIgnoreCase)
+
+[<AutoOpen>]
+module Async = 
+    let map f x = async.Bind(x, fun value -> async.Return(f value))

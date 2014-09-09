@@ -60,7 +60,6 @@
     <Compile Include="Common.fs" />
     <Compile Include="Comparable.fs" />
     <Compile Include="UriBuilder.fs" />
-    <Compile Include="Monads.fs" />
     <Compile Include="Http.fs" />
     <Compile Include="TitleQuery.fs" />
     <Compile Include="WikiApi.fs" />
