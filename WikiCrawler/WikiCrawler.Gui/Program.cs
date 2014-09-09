@@ -73,8 +73,6 @@ namespace WikiCrawler.Gui
 			var layoutPanel = new TableLayoutPanel
 								  {
 									  Dock = DockStyle.Fill,
-									  BorderStyle = BorderStyle.FixedSingle,
-									  CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
 									  Controls =
 										  {
 											  { FlowLayout(Label("Start Page:"), startPageText), 0, 0 },
