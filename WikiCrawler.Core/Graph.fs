@@ -20,7 +20,7 @@ type Graph<'T when 'T : comparison> private (adjacent : Map<Comparable<'T>, Comp
     
     member __.AddNode(node) = 
         let node = Comparable(node, comparer)
-        Graph(adjacent.Add(node, Set([])), comparer)
+        Graph(adjacent.Add(node, getValue node), comparer)
     
     member __.AddLink(one : 'T, two : 'T) = 
         let one = Comparable(one, comparer)

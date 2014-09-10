@@ -125,3 +125,16 @@ type GraphTests() =
                     Is.EquivalentTo([ ("start", [ "one"; "two" ])
                                       ("one", [])
                                       ("two", []) ]))
+    
+    [<Test>]
+    member __.NodeLinksReturnedInSeveralBatches_MergedInGraph() = 
+        let getNodes nodes = 
+            if nodes = [ "start" ] then 
+                async.Return([ { Node = "start"; Edges = [ "one"; "two" ] }; { Node = "start"; Edges = [] } ])
+            else async.Return (List.map (fun x -> {Node=x; Edges=[]}) nodes)
+        
+        let graph = getGraph (getNodes) "start" 2
+        Assert.That(graph.Adjacent, 
+                    Is.EquivalentTo([ ("start", [ "one"; "two" ])
+                                      ("one", [])
+                                      ("two", []) ]))
