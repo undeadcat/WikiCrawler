@@ -23,7 +23,7 @@ namespace WikiCrawler.Gui
 				.Where(x => x > 0)
 				.CombineLatest(FromTextChanged(form.StartPageText), (d, p) => new { Page = p, Depth = d })
 				.DistinctUntilChanged()
-				.Select(x => Observable.FromAsync(token => GraphModule.GetWikiGraph(x.Page, x.Depth).ToTask(token)))
+				.Select(x => GetGraph(x.Page, x.Depth))
 				.Switch()
 				.ObserveOn(SynchronizationContext.Current)
 				.Select(ConvertGraph)
@@ -33,21 +33,14 @@ namespace WikiCrawler.Gui
 				Application.Run(form.Form);
 		}
 
-		private static Graph ConvertGraph(Graph<string> arg)
+		private static IObservable<Graph<string>> GetGraph(string page, int depth)
 		{
-			var graph = new Graph("graph")
-							{
-								GraphAttr = new GraphAttr
-												{
-													NodeAttribute = new NodeAttr { Shape = Shape.Plaintext }, 
-													LayerDirection = LayerDirection.TB, 
-													LayerSep = 500
-												},
-								Directed = true,
-							};
-			foreach (var tuple in arg.Adjacent.SelectMany(x => x.Item2.Select(y => new { One = x.Item1, Two = y })))
-				graph.AddEdge(tuple.One, tuple.Two);
-			return graph;
+			return Observable.FromAsync(token => GraphModule.GetWikiGraph(page, depth).ToTask(token))
+							 .Catch<Graph<string>, Exception>(ex =>
+																  {
+																	  MessageBox.Show(string.Format("An exception occured: {0}, {1}", ex.Message, ex.StackTrace));
+																	  return Observable.Empty<Graph<string>>();
+																  });
 		}
 
 		private static IObservable<string> FromTextChanged(TextBox textBox)
@@ -57,6 +50,23 @@ namespace WikiCrawler.Gui
 											   x => textBox.TextChanged -= x)
 							 .Select(x => ((TextBox) x.Sender).Text)
 							 .Where(x => !String.IsNullOrWhiteSpace(x));
+		}
+
+		private static Graph ConvertGraph(Graph<string> arg)
+		{
+			var graph = new Graph("graph")
+							{
+								GraphAttr = new GraphAttr
+												{
+													NodeAttribute = new NodeAttr { Shape = Shape.Plaintext },
+													LayerDirection = LayerDirection.TB,
+													LayerSep = 500
+												},
+								Directed = true,
+							};
+			foreach (var tuple in arg.Adjacent.SelectMany(x => x.Item2.Select(y => new { One = x.Item1, Two = y })))
+				graph.AddEdge(tuple.One, tuple.Two);
+			return graph;
 		}
 
 		private static bool CanParseInt(string s)
